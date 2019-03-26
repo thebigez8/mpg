@@ -7,6 +7,12 @@ impute <- function(d)
   {
     d$Mileage[u] <- mean(d$Mileage[u + c(-1, 1)])
   }
+  needgallons <- which(is.na(d$Gallons) & d$Notes %in% "unk" & !is.na(d$Price))
+  stopifnot(length(needgallons) == 1)
+  for(u in needgallons)
+  {
+    d$Gallons[u] <- d$Price[u]*mean(d$Gallons[u + c(-1, 1)] / d$Price[u + c(-1, 1)])
+  }
   for(u in which(is.na(d$Date)))
   {
     d$Date[u] <- round(mean(d$Date[u + c(-1, 1)]))
@@ -16,7 +22,13 @@ impute <- function(d)
 
 partial.tanks <- function(d)
 {
-  for(u in which(d$mpg > 100))
+  # didn't buy car with full tank
+  d$mpg[d$Notes %in% c("First fill-up")] <- NA_real_
+
+  pts <- c("2014-06-21", "2014-07-18", "2015-06-13", "2015-07-18", "2016-11-05")
+  fixem <- which(d$Date %in% as.Date(pts) & d$Price %nin% 25.85)
+  stopifnot(length(pts) == length(fixem))
+  for(u in fixem)
   {
     d$mpg[u + 0:1] <- mean(d$mpg[u + 0:1])
     d$smoothed[u + 0:1] <- TRUE
@@ -32,7 +44,7 @@ dat <- "mpg.csv" %>%
     i = 1:n()
   ) %>%
   impute() %>%
-  arrange(is.na(Gallons) & (Notes %nin% c("Bought", "unk")), Date) %>%
+  arrange(is.na(Gallons) & (Notes %nin% c("Bought", "unk", "unknown fill-up")), Date) %>%
   mutate(
     miles = if_else(is.na(Gallons), NA_real_, c(NA_real_, diff(Mileage))),
     mpg = miles / Gallons,
@@ -40,13 +52,13 @@ dat <- "mpg.csv" %>%
     Break = if_else(Date >= as.Date("2017-01-08"), "After", "Before"),
     smoothed = FALSE
   ) %>%
-  arrange(i) %>%
-  partial.tanks()
+  partial.tanks() %>%
+  arrange(i)
 
 stopifnot(diff(dat$Date) >= 0)
 stopifnot(diff(dat$Mileage) > 0)
 stopifnot(all(dat$Gallons > 0, na.rm = TRUE))
-stopifnot(all(!is.na(dat$Gallons) == dat$Notes %in% c("", "est", "unk")))
+stopifnot(all(!is.na(dat$Gallons) == dat$Notes %in% c("", "est", "unk", "First fill-up")))
 stopifnot(all(dat$Price > 0, na.rm = TRUE))
 
 p1 <- dat %>%
