@@ -8,10 +8,11 @@ impute <- function(d)
     d$Mileage[u] <- mean(d$Mileage[u + c(-1, 1)])
   }
   needgallons <- which(is.na(d$Gallons) & d$Notes %in% "unk" & !is.na(d$Price))
-  stopifnot(length(needgallons) == 1)
+  stopifnot(length(needgallons) == 2)
   for(u in needgallons)
   {
-    d$Gallons[u] <- d$Price[u]*mean(d$Gallons[u + c(-1, 1)] / d$Price[u + c(-1, 1)])
+    i <- if(is.na(d$Gallons[u - 1])) -2 else -1
+    d$Gallons[u] <- d$Price[u]*mean(d$Gallons[u + c(i, 1)] / d$Price[u + c(i, 1)])
   }
   for(u in which(is.na(d$Date)))
   {
@@ -49,7 +50,11 @@ dat <- "mpg.csv" %>%
     miles = if_else(is.na(Gallons), NA_real_, c(NA_real_, diff(Mileage))),
     mpg = miles / Gallons,
     ppg = Price / Gallons,
-    Break = if_else(Date >= as.Date("2017-01-08"), "After", "Before"),
+    Break = case_when(
+      Date >= as.Date("2019-05-30") ~ "After 1",
+      Date >= as.Date("2017-01-08") ~ "After",
+      TRUE ~ "Before"
+    ),
     smoothed = FALSE
   ) %>%
   partial.tanks() %>%
